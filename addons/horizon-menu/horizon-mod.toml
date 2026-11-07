@@ -6,3 +6,4 @@ authors = ["anonimmus136ik-hue"]
 api = "0.2"
 side = "client"
 capabilities = ["ui", "storage"]
+experimental = ["ui"]

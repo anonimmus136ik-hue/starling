@@ -20,8 +20,19 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
           components: rustfmt
+      - uses: actions/cache@v4
+        id: packager-cache
+        with:
+          path: ~/.cargo/bin/cargo-horizon-mod
+          key: horizon-menu-packager-fa548eb7-linux-v1
       - name: Install packager from this checkout
-        run: cargo install --path crates/cargo-horizon-mod --locked
+        if: steps.packager-cache.outputs.cache-hit != 'true'
+        run: cargo install --path crates/cargo-horizon-mod --locked --debug
+      - uses: actions/cache/save@v4
+        if: steps.packager-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cargo/bin/cargo-horizon-mod
+          key: horizon-menu-packager-fa548eb7-linux-v1
       - name: Format and unit tests
         working-directory: addons/horizon-menu
         run: |
