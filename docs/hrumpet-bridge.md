@@ -1,9 +1,17 @@
-# Hrumpet: Java mod compatibility investigation
+# Hrumpet для Android
 
-Target: run the user's unmodified Xaero's Minimap Forge 26.5.3 JAR inside the Horizon Rust client for Minecraft 26.3. A native minimap is not an acceptance test.
+Целевой мод — Xaero’s Minimap Forge 26.5.3 для Minecraft 26.3. Критерий готовности — открыть оригинальный JAR, зайти в мир в Hrumpet и увидеть карту, которую рисует сам Xaero.
 
-The supplied archive declares Forge 66.0.2 or newer and contains 661 class files and four Mixin configs. An Android file picker can supply the bytes. The regular mod installer subsequently calls horizon_mods::Package::read and expects a Horizon manifest/component. Selecting a JAR does not execute its classes.
+## Импорт на телефоне
 
-A proposed Java host needs class loading for the Minecraft version, Forge lifecycle and mappings, translated game hooks for injected methods, and rendering/input adapters. A list of nearby entities passed over JNI would cover only one input. No runtime compatibility is implemented in this branch.
+В экспериментальной сборке открой Mods → Import .hmod / Forge JAR и выбери файл. Импортёр проверяет ZIP, пути, размеры, наличие META-INF/mods.toml и класса. После проверки он сохраняет исходный JAR в папке forge-imports игрового профиля. Сообщение «Android Forge runtime unavailable» означает, что файл сохранён и ждёт поддержки исполнения. Обычные моды Horizon в формате .hmod по-прежнему проходят через установщик Horizon.
 
-First executable milestone: load a small unmodified Forge test JAR, deliver its client initialization and a frame event from Horizon, and observe HUD pixels produced by its Java callback. Next test the target JAR unchanged and record the first unsupported class or injection target. Test multiplayer and compare frame times on the same Android device, world and settings. Branding alone cannot establish compatibility.
+## Что можно проверить
+
+- `hrumpet/bridge/test.sh` проверяет передачу пикселей от тестового Java-плагина в C++ через JNI на компьютере.
+- `hrumpet/forge-baseline/run.sh` запускает эталонный клиент Forge 66.0.2 под Linux с Java 25 и виртуальным дисплеем. Скрипт сверяет SHA-512 оригинального Xaero и ищет сообщение второй стадии загрузки мода. Итог каждого запуска смотри в GitHub Actions → Hrumpet Forge reference.
+- В GitHub Actions → Hrumpet ARM64 preview после успешной сборки доступен архив с экспериментальным APK и SHA256SUMS.txt. Сборка использует временную подпись и идентификатор приложения dev.horizon.android.dev. Она может конфликтовать с другой dev-сборкой, подписанной другим ключом.
+
+## Что ещё требуется для игры
+
+Архив Xaero содержит 661 класс Java и четыре конфигурации Mixin. Для работы карты Hrumpet требуется совместимая среда Java 25 с жизненным циклом Forge и поддержкой точек внедрения Mixin в классы Minecraft. Для подключения к движку Horizon нужны передача данных мира, ввод и вывод кадров HUD. Проверка производительности требует одного телефона, одинаковых мира, настроек и маршрута в обеих сборках.
