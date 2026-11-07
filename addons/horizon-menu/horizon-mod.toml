@@ -1,0 +1,8 @@
+id = "horizon_menu"
+name = "Horizon Menu"
+version = "0.1.0"
+description = "Standalone menu. Open with /hmodmenu or Options > Mods > Horizon Menu > Settings. Does not manage other mods."
+authors = ["anonimmus136ik-hue"]
+api = "0.2"
+side = "client"
+capabilities = ["ui", "storage"]

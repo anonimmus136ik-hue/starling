@@ -1,0 +1,8 @@
+[[step]]
+command = "hmodmenu"
+expect.feedback = "Horizon Menu opened"
+
+[[step]]
+reload = true
+command = "hmodmenu"
+expect.feedback = "Horizon Menu opened"
