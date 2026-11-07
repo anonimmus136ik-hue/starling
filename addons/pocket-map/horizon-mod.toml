@@ -1,6 +1,6 @@
 id="pocket_map"
 name="Pocket Map"
-version="0.2.0"
+version="0.2.1"
 authors=["anonimmus136ik-hue"]
 description="Configurable terrain minimap. Use /pocketmap or Options > Mods."
 api="0.2"
