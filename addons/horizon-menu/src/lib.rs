@@ -1,6 +1,6 @@
 //! Standalone UI only. No world writes, input capture, or access to other mods.
 use horizon_mod_sdk::{
-    Mod, Registration, storage,
+    Mod, Registration, storage, input, command,
     ui::{self, ButtonWidget, Screen, TextWidget, Widget},
 };
 
@@ -16,6 +16,7 @@ enum Page {
     Home,
     Help,
     About,
+    Macros,
 }
 
 #[derive(Default)]
@@ -24,8 +25,24 @@ struct Menu {
     page: Page,
     screen_open: bool,
     notice: bool,
+    shortcuts: Vec<Shortcut>,
 }
 
+#[derive(Clone)]
+struct Shortcut { key: String, label: String, line: String }
+impl Shortcut {
+    fn parse(raw: &str) -> Result<Self,String> {
+        let fields: Vec<_> = raw.split('|').map(str::trim).collect();
+        if fields.len()!=3 || raw.chars().any(char::is_control) { return Err("Пример: /hmacro K | Время | time query daytime".into()); }
+        let key=fields[0].to_ascii_lowercase();
+        let line=fields[2].trim_start_matches('/');
+        if key.is_empty() || !key.bytes().all(|b|b.is_ascii_alphanumeric() || b==b'.') || fields[1].is_empty() || fields[1].chars().count()>32 || line.is_empty() || line.len()>256 { return Err("Проверь клавишу, название и команду".into()); }
+        Ok(Self {key,label:fields[1].into(),line:line.into()})
+    }
+    fn register(&self, slot: usize)->Result<(),String>{
+        input::register_key(&format!("slot{slot}"),&self.label,&format!("key.keyboard.{}",self.key))
+    }
+}
 fn text(id: u32, value: &str) -> Widget {
     Widget::Text(TextWidget { id, text: value.into(), color: 0 })
 }
@@ -44,9 +61,15 @@ impl Menu {
                 text(1, "Horizon Menu 0.1.0"),
                 text(2, self.label("Отдельное меню .hmod", "Standalone .hmod menu")),
                 button(LANGUAGE, self.label("Язык: Русский", "Language: English")),
+                button(15, self.label("Мои макросы", "My macros")),
                 button(HELP, self.label("Где настройки других модов?", "Where are other mods' settings?")),
                 button(ABOUT, self.label("О моде", "About")),
             ],
+            Page::Macros => {
+                let mut items=vec![text(21,"/hmacro K | Время | time query daytime"),text(22,"/hmacro del K")];
+                for (i,m) in self.shortcuts.iter().enumerate(){items.push(button(30+i as u32,&format!("{} · {}",m.key.to_uppercase(),m.label)));}
+                items.push(button(BACK,self.label("Назад","Back"))); items
+            }
             Page::Help => vec![
                 text(1, self.label("Закрой это меню кнопкой Done / Готово.", "Close this menu with Done.")),
                 text(2, self.label("Открой Options > Mods в Horizon.", "Open Options > Mods in Horizon.")),
@@ -84,15 +107,39 @@ impl Menu {
 
 impl Mod for Menu {
     fn init() -> Result<(Self, Registration), String> {
-        let menu = Self {
+        let mut menu = Self {
             english: storage::get("language").as_deref() == Some(b"en"),
             ..Self::default()
         };
+        if let Some(data)=storage::get("shortcuts-v1"){
+            for row in String::from_utf8_lossy(&data).lines().take(6){
+                if let Ok(m)=Shortcut::parse(row){m.register(menu.shortcuts.len())?;menu.shortcuts.push(m);}
+            }
+        }
         ui::set_settings(&menu.widgets());
-        Ok((menu, Registration::new().command("hmodmenu")))
+        Ok((menu, Registration::new().command("hmodmenu").command("hmacro").on_tick()))
     }
 
     fn command(&mut self, name: &str, args: &str) -> Result<Option<String>, String> {
+        if name=="hmacro" {
+            let mut next=self.shortcuts.clone();
+            if let Some(key)=args.trim().strip_prefix("del "){
+                let i=next.iter().position(|m|m.key.eq_ignore_ascii_case(key.trim())).ok_or("Нет такой кнопки")?;
+                next.remove(i);
+            } else {
+                let m=Shortcut::parse(args)?;
+                let i=next.iter().position(|old|old.key==m.key).unwrap_or(next.len());
+                if i>=6 { return Err("Доступно 6 кнопок".into()); }
+                m.register(i)?;
+                if i==next.len(){next.push(m);}else{next[i]=m;}
+            }
+            let encoded=next.iter().map(|m|format!("{}|{}|{}",m.key,m.label,m.line)).collect::<Vec<_>>().join("\n");
+            storage::set("shortcuts-v1",encoded.as_bytes())?;
+            for (i,m) in next.iter().enumerate(){m.register(i)?;}
+            self.shortcuts=next;
+            self.refresh();
+            return Ok(Some("Макросы сохранены".into()));
+        }
         if name != "hmodmenu" {
             return Err("Unknown command".into());
         }
@@ -105,6 +152,13 @@ impl Mod for Menu {
         Ok(Some("Horizon Menu opened".into()))
     }
 
+    fn tick(&mut self,_:u64){
+        for event in input::poll(){if let input::Event::KeyDown(name)=event{
+            if let Some(m)=name.strip_prefix("slot").and_then(|s|s.parse::<usize>().ok()).and_then(|i|self.shortcuts.get(i)){
+                command::run(&m.line);
+            }
+        }}
+    }
     fn ui_select(&mut self, id: u32, row: u32) {
         if row != 0 { return; }
         match (self.page, id) {
@@ -113,6 +167,8 @@ impl Mod for Menu {
                 let value: &[u8] = if self.english { b"en" } else { b"ru" };
                 self.notice = storage::set("language", value).is_err();
             }
+            (Page::Home,15)=>self.page=Page::Macros,
+            (Page::Macros,30..=35)=>{if let Some(m)=self.shortcuts.get((id-30) as usize){command::run(&m.line);}return;}
             (Page::Home, HELP) => self.page = Page::Help,
             (Page::Home, ABOUT) => self.page = Page::About,
             (_, BACK) => self.page = Page::Home,
