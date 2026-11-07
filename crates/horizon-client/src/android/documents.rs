@@ -378,10 +378,11 @@ fn stage(request: Request, mut input: std::fs::File, name: String) -> Result<()>
         );
         return Ok(());
     }
-    if !content_files::plain_name(&name) || !request.kind.accepts(&name) {
+    let jar = content_files::is_java_archive(request.kind, &name);
+    if !content_files::plain_name(&name) || !(request.kind.accepts(&name) || jar) {
         return Err("Selected file has the wrong extension for this folder".into());
     }
-    let dir = request.home.join(request.kind.folder());
+    let dir = request.home.join(if jar { "forge-imports" } else { request.kind.folder() });
     std::fs::create_dir_all(&dir)?;
     if std::fs::symlink_metadata(&dir)?.file_type().is_symlink() {
         return Err("Refusing a redirected content directory".into());
@@ -419,7 +420,7 @@ fn stage(request: Request, mut input: std::fs::File, name: String) -> Result<()>
         let native_shader = content_files::validate(&staged, request.kind, &name, || {
             CANCEL.load(Ordering::Relaxed)
         })?;
-        let name = if request.kind == Kind::Mods {
+        let name = if request.kind == Kind::Mods && !jar {
             format!("{}.hmod", horizon_mods::Package::read(&staged)?.manifest.id)
         } else if native_shader || name.to_ascii_lowercase().ends_with(".hshader") {
             let pack = horizon_shader_api::Pack::read(&staged)?;
@@ -449,6 +450,10 @@ fn stage(request: Request, mut input: std::fs::File, name: String) -> Result<()>
             );
         } else {
             std::fs::rename(&staged, &target)?;
+            if jar {
+                notice("Forge JAR saved in forge-imports. Android Forge runtime unavailable.", true);
+                return Ok(());
+            }
             imported(
                 format!(
                     "Imported {} into {}. Enable it in game settings.",
@@ -487,7 +492,7 @@ pub fn resolve(choice: Choice) {
             return Err("Cannot replace a folder or symbolic link".into());
         }
         if matches!(choice, Choice::KeepBoth) {
-            if c.kind == Kind::Mods {
+            if c.kind == Kind::Mods && !c.target.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("jar")) {
                 return Err(
                     "A mod ID cannot be installed twice; choose Replace to update it".into(),
                 );
@@ -527,6 +532,9 @@ pub fn resolve(choice: Choice) {
         Ok(())
     })();
     match result {
+        Ok(()) if c.target.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("jar")) => {
+            notice("Forge JAR saved in forge-imports. Android Forge runtime unavailable.", true);
+        }
         Ok(()) => imported(
             "Import completed. Enable it in Installed or game settings.",
             c.kind,
@@ -587,7 +595,7 @@ pub fn draw_ui(ui: &mut Ui<'_>) {
                 .unwrap_or_default()
                 .to_string_lossy()
                 .into_owned(),
-            if c.kind == Kind::Mods {
+            if c.kind == Kind::Mods && !c.target.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("jar")) {
                 vec![("Replace", Choice::Replace), ("Cancel", Choice::Cancel)]
             } else {
                 vec![
@@ -698,7 +706,7 @@ pub fn handle_event(event: &winit::event::WindowEvent) -> bool {
                         .unwrap_or_else(|e| e.into_inner())
                         .conflict
                         .as_ref()
-                        .is_some_and(|c| c.kind == Kind::Mods);
+                        .is_some_and(|c| c.kind == Kind::Mods && !c.target.extension().is_some_and(|ext| ext.eq_ignore_ascii_case("jar")));
                     resolve(if native {
                         Choice::Cancel
                     } else {

@@ -50,13 +50,17 @@ pub fn plain_name(name: &str) -> bool {
         )
         && Path::new(name).components().count() == 1
 }
+pub fn is_java_archive(kind: Kind, name: &str) -> bool {
+    kind == Kind::Mods && name.to_ascii_lowercase().ends_with(".jar")
+}
 pub fn validate(
     path: &Path,
     kind: Kind,
     name: &str,
     cancelled: impl Fn() -> bool,
 ) -> crate::Result<bool> {
-    if !plain_name(name) || !kind.accepts(name) {
+    let jar = is_java_archive(kind, name);
+    if !plain_name(name) || !(kind.accepts(name) || jar) {
         return Err(
             "Choose a ZIP pack, .hshader shader pack or sandboxed .hmod matching this folder"
                 .into(),
@@ -79,6 +83,8 @@ pub fn validate(
     let mut shader = false;
     let mut native_shader = false;
     let mut manifest = false;
+    let mut forge_metadata = false;
+    let mut java_class = false;
     let mut buffer = [0u8; 65536];
     for i in 0..zip.len() {
         if cancelled() {
@@ -111,6 +117,8 @@ pub fn validate(
                 && ["vsh", "fsh", "glsl", "csh", "gsh", "tcs", "tes"]
                     .iter()
                     .any(|ext| raw.ends_with(&format!(".{ext}")));
+        forge_metadata |= !entry.is_dir() && raw == "META-INF/mods.toml" && entry.size() > 0;
+        java_class |= !entry.is_dir() && raw.ends_with(".class") && entry.size() >= 8;
         manifest |= raw == "horizon-mod.toml";
         let expected = entry.size();
         if raw == "pack.mcmeta" && expected > 1 << 20 {
@@ -148,6 +156,7 @@ pub fn validate(
     if !match kind {
         Kind::Packs => pack,
         Kind::Shaders => shader,
+        Kind::Mods if jar => forge_metadata && java_class,
         Kind::Mods => manifest,
     } {
         return Err(format!(
@@ -156,7 +165,7 @@ pub fn validate(
         )
         .into());
     }
-    if kind == Kind::Mods {
+    if kind == Kind::Mods && !jar {
         // Accept both sandboxed code and upstream content-only packages. The
         // shared parser requires mod.wasm unless the manifest grants registries.
         horizon_mods::Package::read(path).map_err(|e| format!("Invalid Horizon mod: {e}"))?;
@@ -256,6 +265,9 @@ mod tests {
         )
         .unwrap();
         assert!(validate(&path, Kind::Mods, "Code.hmod", || false).is_ok());
+        std::fs::write(&path, archive(&[("META-INF/mods.toml", b"modLoader='javafml'"), ("Example.class", b"\xca\xfe\xba\xbe\x00\x00\x00\x45")])).unwrap();
+        assert!(validate(&path, Kind::Mods, "Example.JAR", || false).is_ok());
+        assert!(validate(&path, Kind::Mods, "Example.hmod", || false).is_err());
         let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
         writer
             .add_symlink(

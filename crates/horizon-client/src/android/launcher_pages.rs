@@ -1616,7 +1616,7 @@ impl Launcher {
                 &mut self.targets,
                 [content_x + field_w + 8.0, search_y, search_btn_w, 36.0],
                 if page == Page::Mods && self.catalog.query.trim().starts_with("https://") {
-                    "Import .hmod"
+                    "Import .hmod / Forge JAR"
                 } else {
                     "Search"
                 },
