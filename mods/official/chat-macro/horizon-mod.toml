@@ -1,0 +1,9 @@
+id = "chat_macro"
+name = "Chat Macro"
+version = "0.1.0"
+description = "Run a saved chat command with a configurable key (Caps Lock by default). Set it with /chatmacro set say Hello!"
+authors = ["Community"]
+api = "0.1"
+side = "client"
+capabilities = ["input", "command", "storage", "chat", "ui"]
+experimental = ["input"]
