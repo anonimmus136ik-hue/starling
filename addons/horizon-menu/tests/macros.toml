@@ -1,0 +1,7 @@
+[[step]]
+command="hmacro K | Время | time query daytime"
+expect.feedback="Макросы сохранены"
+[[step]]
+reload=true
+command="hmacro del K"
+expect.feedback="Макросы сохранены"

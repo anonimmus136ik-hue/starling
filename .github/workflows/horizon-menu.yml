@@ -1,0 +1,53 @@
+name: Build Horizon Menu
+on:
+  push:
+    branches: [prototype/hrumpet]
+    paths:
+      - 'addons/horizon-menu/**'
+      - '.github/workflows/horizon-menu.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt
+      - name: Install target for the repository's pinned Rust version
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/cache@v4
+        id: packager-cache
+        with:
+          path: ~/.cargo/bin/cargo-horizon-mod
+          key: horizon-menu-packager-fa548eb7-linux-v1
+      - name: Install packager from this checkout
+        if: steps.packager-cache.outputs.cache-hit != 'true'
+        run: cargo install --path crates/cargo-horizon-mod --locked --debug
+      - uses: actions/cache/save@v4
+        if: steps.packager-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cargo/bin/cargo-horizon-mod
+          key: horizon-menu-packager-fa548eb7-linux-v1
+      - name: Format and unit tests
+        working-directory: addons/horizon-menu
+        run: |
+          cargo fmt
+          cargo test --lib
+      - name: Build and sandbox checks
+        working-directory: addons/horizon-menu
+        run: |
+          cargo horizon-mod build
+          cargo horizon-mod test
+          cargo horizon-mod check target/horizon-mod/horizon_menu.hmod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-menu-hmod
+          path: addons/horizon-menu/target/horizon-mod/horizon_menu.hmod
+          if-no-files-found: error
