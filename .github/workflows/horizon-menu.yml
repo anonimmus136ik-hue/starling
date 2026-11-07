@@ -20,6 +20,8 @@ jobs:
         with:
           targets: wasm32-unknown-unknown
           components: rustfmt
+      - name: Install target for the repository's pinned Rust version
+        run: rustup target add wasm32-unknown-unknown
       - uses: actions/cache@v4
         id: packager-cache
         with:
