@@ -5,5 +5,5 @@ description = "Run a saved chat command with a configurable key (Caps Lock by de
 authors = ["Community"]
 api = "0.1"
 side = "client"
-capabilities = ["input", "command", "storage", "chat"]
+capabilities = ["input", "command", "storage", "chat", "ui"]
 experimental = ["input"]
