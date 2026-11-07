@@ -1,0 +1,19 @@
+name: Hrumpet Forge reference
+on:
+  push:
+    branches: [prototype/hrumpet]
+    paths: ['hrumpet/forge-baseline/**','.github/workflows/hrumpet-forge-baseline.yml']
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 24
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - run: sudo apt-get update -qq && sudo apt-get install -y xvfb xauth libgl1-mesa-dri mesa-vulkan-drivers
+      - run: bash hrumpet/forge-baseline/run.sh
