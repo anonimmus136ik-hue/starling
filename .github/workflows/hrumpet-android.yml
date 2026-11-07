@@ -4,6 +4,7 @@ on:
     branches: [prototype/hrumpet]
     paths:
       - 'crates/**'
+      - 'tools/**'
       - 'packaging/android/**'
       - '.github/workflows/hrumpet-android.yml'
   workflow_dispatch:
