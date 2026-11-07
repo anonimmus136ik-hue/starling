@@ -29,7 +29,7 @@ impl ChatMacro {
     fn load_bool(key: &str) -> bool {
         storage::get(key)
             .and_then(|bytes| String::from_utf8(bytes).ok())
-            .is_none_or(|value| value != b"false")
+            .is_none_or(|value| value.as_slice() != b"false")
     }
 
     fn save(&self) -> Result<(), String> {
