@@ -1,0 +1,3 @@
+[[step]]
+command="pocketmap"
+expect.feedback="Pocket Map"
