@@ -27,6 +27,15 @@ while IFS= read -r member; do
     unzip -p xaero.jar "$member" > "deps/$index.jar"
     index=$((index + 1))
 done < <(unzip -p xaero.jar META-INF/jarjar/metadata.json | jq -r '.jars[].path')
+curl -fsSL --retry 3 https://piston-meta.mojang.com/mc/game/version_manifest_v2.json -o versions.json
+read -r metadata_url metadata_sha < <(jq -er '.versions[] | select(.id=="26.3") | [.url,.sha1] | @tsv' versions.json)
+curl -fsSL --retry 3 "$metadata_url" -o version.json
+echo "$metadata_sha  version.json" | sha1sum -c -
+while read -r url hash; do
+    file="deps/${url##*/}"
+    curl -fsSL --retry 3 "$url" -o "$file"
+    echo "$hash  $file" | sha1sum -c -
+done < <(jq -r '.libraries[] | select(.name | startswith("org.apache.logging.log4j:")) | .downloads.artifact | [.url,.sha1] | @tsv' version.json)
 cat > Probe.java <<'JAVA'
 import xaero.common.minimap.waypoints.WaypointUtil;
 public class Probe {
@@ -34,8 +43,9 @@ public class Probe {
         if (args.length != 0) {
             // Probe linking separately from execution of the self-contained helper.
             try {
-                Class.forName("xaero.minimap.XaeroMinimapForge");
+                var entry = Class.forName("xaero.minimap.XaeroMinimapForge");
                 System.out.println("Xaero entry class initialized");
+                System.out.println(java.util.Arrays.toString(entry.getDeclaredConstructors()));
             } catch (LinkageError missing) {
                 missing.printStackTrace(System.out);
             }
