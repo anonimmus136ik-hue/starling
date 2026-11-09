@@ -42,7 +42,11 @@ for profile in ("forge.json", "version.json"):
         seen.add(key)
         print(art["path"], art["sha1"], art["url"] or "-", sep="\t")
 PY
-mkdir -p runtime/libraries
+mkdir -p runtime/libraries runtime/assets/indexes runtime/config
+read -r asset_id url hash < <(jq -r '.assetIndex | [.id,.url,.sha1] | @tsv' version.json)
+fetch "$url" "$hash" "runtime/assets/indexes/$asset_id.json"
+# No separate desktop-style early loading window in the shell experiment.
+echo 'earlyWindowControl=false' > runtime/config/fml.toml
 classpath=
 while read -r path hash url; do
     dest="runtime/libraries/$path"
@@ -62,5 +66,5 @@ probe_cp="$remote:$remote/xaero.jar"
 for library in deps/*.jar; do probe_cp="$probe_cp:$remote/$library"; done
 adb shell "cd $remote/runtime && HOME=$remote TMPDIR=$remote JAVA_HOME=$remote/jre LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server $remote/hrumpet-host $remote/jre $probe_cp:$classpath Probe link" | tee constructor.log
 grep -F 'XaeroMinimapForge(net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext)' constructor.log
-adb shell "cd $remote/runtime && HOME=$remote TMPDIR=$remote JAVA_HOME=$remote/jre LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server $remote/hrumpet-host $remote/jre $classpath net/minecraftforge/bootstrap/ForgeBootstrap --launchTarget forge_client --version 26.3 --gameDir $remote/runtime --assetsDir $remote/runtime/assets --assetIndex 26.3 --username Player --accessToken 0 --demo" 2>&1 | tee forge-android.log
+adb shell "cd $remote/runtime && HOME=$remote TMPDIR=$remote JAVA_HOME=$remote/jre LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server $remote/hrumpet-host $remote/jre $classpath net/minecraftforge/bootstrap/ForgeBootstrap --launchTarget forge_client --version 26.3 --gameDir $remote/runtime --assetsDir $remote/runtime/assets --assetIndex $asset_id --username Player --accessToken 0 --demo" 2>&1 | tee forge-android.log
 grep -F "Loading Xaero's Minimap - Stage 2/3" forge-android.log
