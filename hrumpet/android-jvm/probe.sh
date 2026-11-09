@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Requires a disposable Android device accessible through adb, plus JDK 25.
 set -euo pipefail
+source_dir=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
 remote=$(adb shell mktemp -d /data/local/tmp/hrumpet.XXXXXX | tr -d '\r')
 [[ "$remote" == /data/local/tmp/hrumpet.* ]]
@@ -41,9 +42,11 @@ public class Probe {
 JAVA
 javac -cp xaero.jar Probe.java
 java -cp .:xaero.jar Probe > reference.txt
-adb push jre xaero.jar Probe.class "$remote/" >/dev/null
+compiler=$(find "$ANDROID_NDK_HOME" -name "${triple}28-clang" -print -quit)
+"$compiler" -Wall -Wextra -Werror "$source_dir/host.c" -L jre/lib/server -ljvm -Wl,--allow-shlib-undefined -o hrumpet-host
+adb push hrumpet-host jre xaero.jar Probe.class "$remote/" >/dev/null
 run_probe() {
-    adb shell "cd $remote && LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server JAVA_HOME=$remote/jre HOME=$remote TMPDIR=$remote ./jre/bin/java -Djava.io.tmpdir=$remote -cp .:xaero.jar Probe $1"
+    adb shell "cd $remote && LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server JAVA_HOME=$remote/jre HOME=$remote TMPDIR=$remote ./hrumpet-host $remote/jre .:xaero.jar Probe $1"
 }
 run_probe '' | tr -d '\r' > android.txt
 diff -u reference.txt android.txt
