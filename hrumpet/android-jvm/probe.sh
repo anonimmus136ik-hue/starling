@@ -72,3 +72,5 @@ run_probe '' | tr -d '\r' > android.txt
 diff -u reference.txt android.txt
 cat android.txt
 run_probe link
+
+bash "$source_dir/forge-client.sh" "$remote" xaero.jar
