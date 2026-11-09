@@ -27,7 +27,7 @@ public class Probe {
         if (args.length != 0) {
             // Probe linking separately from execution of the self-contained helper.
             try {
-                Class.forName("xaero.minimap.XaeroMinimap");
+                Class.forName("xaero.minimap.XaeroMinimapForge");
                 System.out.println("Xaero entry class initialized");
             } catch (LinkageError missing) {
                 missing.printStackTrace(System.out);
