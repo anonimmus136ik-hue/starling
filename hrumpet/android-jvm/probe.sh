@@ -20,6 +20,13 @@ tar -xJf jre.tar.xz -C jre
 cp "$(find "${ANDROID_NDK_HOME:?}" -path "*/sysroot/usr/lib/$triple/libc++_shared.so" -print -quit)" jre/lib/
 curl -fsSL --retry 3 https://cdn.modrinth.com/data/1bokaNcj/versions/mtjQ3mVQ/xaerominimap-forge-26.3-26.5.3.jar -o xaero.jar
 echo "c4443a406b5c9c309548a110e5ae119af3a8df544522053e4249d8bbfb777ec3f9a85e1c0c9847771fa572c8c749814cb335dc8f62f9b529a3a2d00358c38b86  xaero.jar" | sha512sum -c -
+# Source is the exact checksum-pinned mod above. Use local names for its Forge JarJar entries.
+mkdir deps
+index=0
+while IFS= read -r member; do
+    unzip -p xaero.jar "$member" > "deps/$index.jar"
+    index=$((index + 1))
+done < <(unzip -p xaero.jar META-INF/jarjar/metadata.json | jq -r '.jars[].path')
 cat > Probe.java <<'JAVA'
 import xaero.common.minimap.waypoints.WaypointUtil;
 public class Probe {
@@ -45,9 +52,11 @@ java -cp .:xaero.jar Probe > reference.txt
 compiler=$(find "$ANDROID_NDK_HOME" -name "${triple}28-clang" -print -quit)
 "$compiler" -Wall -Wextra -Werror -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" "$source_dir/host.c" -L jre/lib/server -ljvm -Wl,--allow-shlib-undefined -o hrumpet-host
 # Android's shell SELinux domain can write regular files here but cannot make symlinks.
-tar --hard-dereference --dereference -cf - jre hrumpet-host xaero.jar Probe.class | adb shell -T "cd $remote && tar xf -"
+tar --hard-dereference --dereference -cf - jre hrumpet-host xaero.jar deps Probe.class | adb shell -T "cd $remote && tar xf -"
+classpath=.:xaero.jar
+for jar in deps/*.jar; do classpath="$classpath:$jar"; done
 run_probe() {
-    adb shell "cd $remote && LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server JAVA_HOME=$remote/jre HOME=$remote TMPDIR=$remote ./hrumpet-host $remote/jre .:xaero.jar Probe $1"
+    adb shell "cd $remote && LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server JAVA_HOME=$remote/jre HOME=$remote TMPDIR=$remote ./hrumpet-host $remote/jre $classpath Probe $1"
 }
 run_probe '' | tr -d '\r' > android.txt
 diff -u reference.txt android.txt
