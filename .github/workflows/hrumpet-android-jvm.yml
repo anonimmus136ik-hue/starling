@@ -1,0 +1,27 @@
+name: Xaero bytecode on Android
+on:
+  push:
+    branches: [prototype/hrumpet]
+    paths: ['hrumpet/android-jvm/**', '.github/workflows/hrumpet-android-jvm.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Enable KVM
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          script: bash hrumpet/android-jvm/probe.sh
