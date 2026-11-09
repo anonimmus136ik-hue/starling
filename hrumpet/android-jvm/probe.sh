@@ -44,7 +44,8 @@ javac -cp xaero.jar Probe.java
 java -cp .:xaero.jar Probe > reference.txt
 compiler=$(find "$ANDROID_NDK_HOME" -name "${triple}28-clang" -print -quit)
 "$compiler" -Wall -Wextra -Werror "$source_dir/host.c" -L jre/lib/server -ljvm -Wl,--allow-shlib-undefined -o hrumpet-host
-adb push hrumpet-host jre xaero.jar Probe.class "$remote/" >/dev/null
+# Android's shell SELinux domain can write regular files here but cannot make symlinks.
+tar --dereference -cf - jre hrumpet-host xaero.jar Probe.class | adb shell -T "cd $remote && tar xf -"
 run_probe() {
     adb shell "cd $remote && LD_LIBRARY_PATH=$remote/jre/lib:$remote/jre/lib/server JAVA_HOME=$remote/jre HOME=$remote TMPDIR=$remote ./hrumpet-host $remote/jre .:xaero.jar Probe $1"
 }
